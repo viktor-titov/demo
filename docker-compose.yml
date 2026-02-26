@@ -1,0 +1,126 @@
+name: nocodb-demo
+
+services:
+  tunnel:
+    image: ngrok/ngrok:latest
+    restart: unless-stopped
+    container_name: ngrok
+    environment:
+      NGROK_AUTHTOKEN: "3ACAj3luVBJKlpsKmvfQ7gpiCvH_4GH97EomL1ecgTriBNfL2" # Получается бесплатно на сайте ngrok
+    command:
+      # Направляем весь публичный трафик на 80 порт твоего Nginx Proxy Manager
+      - "http"
+      - "npm:80" 
+    ports:
+      - "4040:4040"
+    networks:
+      - nocodb-demo-network
+  front:
+    build:
+      context: ./front/demo
+      dockerfile: Dockerfile
+    container_name: demo-front
+    ports:
+      - "1234:80"
+    restart: unless-stopped
+    networks:
+      - nocodb-demo-network
+  npm:
+    image: 'jc21/nginx-proxy-manager:latest'
+    restart: unless-stopped
+    environment:
+      TZ: "Australia/Brisbane"
+      DB_POSTGRES_HOST: root_db
+      DB_POSTGRES_PORT: 5432
+      DB_POSTGRES_USER: postgres
+      DB_POSTGRES_PASSWORD: password
+    depends_on:
+      - root_db
+    ports:
+      - '80:80'
+      - '81:81'
+      - '443:443'
+    volumes:
+      - npm_data:/data
+      - ./letsencrypt:/etc/letsencrypt
+    networks:
+      - nocodb-demo-network
+  n8n:
+    image: "docker.n8n.io/n8nio/n8n"
+    restart: always
+    container_name: n8n_app
+    depends_on:
+      root_db:
+        condition: service_healthy
+    ports:
+      - "5678:5678"
+    environment:
+      # GENERIC_TIMEZONE: "<YOUR_TIMEZONE>"
+      # TZ: "<YOUR_TIMEZONE>"
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: true
+      N8N_SECURE_COOKIE: false
+      N8N_RUNNERS_ENABLED: true
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_DATABASE: root_db
+      DB_POSTGRESDB_HOST: root_db
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_USER: postgres
+      # DB_POSTGRESDB_SCHEMA: <POSTGRES_SCHEMA>
+      DB_POSTGRESDB_PASSWORD: password
+      WEBHOOK_URL: "https://nocodb.unwetted-idella-unaccessible.ngrok-free.dev"
+    volumes:
+      - "n8n_data:/home/node/.n8n"
+    networks:
+      - nocodb-demo-network
+    
+  nocodb: 
+    depends_on: 
+      root_db: 
+        condition: service_healthy
+    environment: 
+      NC_DB: "pg://root_db:5432?u=postgres&p=password&d=root_db"
+    image: "nocodb/nocodb:latest"
+    ports: 
+      - "8080:8080"
+    restart: always
+    volumes: 
+      - "nc_data:/usr/app/data"
+    networks:
+      - nocodb-demo-network
+  root_db: 
+    environment: 
+      POSTGRES_DB: root_db
+      POSTGRES_PASSWORD: password
+      POSTGRES_USER: postgres
+    healthcheck:
+      # test: ['CMD-SHELL', 'pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      test: ['CMD-SHELL', 'pg_isready -h localhost -U postgres -d root_db']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    image: postgres:16.6
+    restart: always
+    volumes: 
+      - "db_data:/var/lib/postgresql/data"
+    networks:
+      - nocodb-demo-network
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: my_pgadmin
+    restart: always
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@mail.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    networks:
+      - nocodb-demo-network
+volumes: 
+  db_data:
+  nc_data:
+  pgadmin_data:
+  n8n_data:
+  npm_data:
+networks:
+  nocodb-demo-network:
+    driver: bridge

@@ -1,0 +1,39 @@
+/* Стилизуем под нативную тему Telegram */
+    .tg-container {
+      padding: 16px;
+      color: var(--tg-theme-text-color, #000);
+      background-color: var(--tg-theme-bg-color, #fff);
+      font-family: sans-serif;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+      color: var(--tg-theme-hint-color, #999);
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+      border: 1px solid var(--tg-theme-hint-color, #ccc);
+      border-radius: 8px;
+      background-color: var(--tg-theme-secondary-bg-color, #f4f4f5);
+      color: var(--tg-theme-text-color, #000);
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: var(--tg-theme-button-color, #3390ec);
+      color: var(--tg-theme-button-text-color, #fff);
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
