@@ -16,9 +16,7 @@ services:
     networks:
       - nocodb-demo-network
   front:
-    build:
-      context: ./front/demo
-      dockerfile: Dockerfile
+    image: "ghcr.io/viktor-titov/demo-front:0.0.0"
     container_name: demo-front
     ports:
       - "1234:80"
@@ -67,7 +65,7 @@ services:
       DB_POSTGRESDB_USER: postgres
       # DB_POSTGRESDB_SCHEMA: <POSTGRES_SCHEMA>
       DB_POSTGRESDB_PASSWORD: password
-      WEBHOOK_URL: "https://nocodb.unwetted-idella-unaccessible.ngrok-free.dev"
+      WEBHOOK_URL: "https://unwetted-idella-unaccessible.ngrok-free.dev/n8n/"
     volumes:
       - "n8n_data:/home/node/.n8n"
     networks:
