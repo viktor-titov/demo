@@ -52,7 +52,7 @@ services:
       DB_POSTGRESDB_USER: postgres
       # DB_POSTGRESDB_SCHEMA: <POSTGRES_SCHEMA>
       DB_POSTGRESDB_PASSWORD: password
-      WEBHOOK_URL: "https://unwetted-idella-unaccessible.ngrok-free.dev/n8n/"
+      WEBHOOK_URL: "https://n8n.nulltomato-demo.ru"
     volumes:
       - "n8n_data:/home/node/.n8n"
     networks:
