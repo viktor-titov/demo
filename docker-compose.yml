@@ -2,7 +2,7 @@ name: pachamama
 
 services:
   front:
-    image: "ghcr.io/viktor-titov/demo-front:0.0.0"
+    image: "ghcr.io/viktor-titov/demo-front:0.0.2"
     container_name: pachamama-front
     ports:
       - "1234:80"
