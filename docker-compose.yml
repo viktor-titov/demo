@@ -1,23 +1,9 @@
 name: nocodb-demo
 
 services:
-  tunnel:
-    image: ngrok/ngrok:latest
-    restart: unless-stopped
-    container_name: ngrok
-    environment:
-      NGROK_AUTHTOKEN: "3ACAj3luVBJKlpsKmvfQ7gpiCvH_4GH97EomL1ecgTriBNfL2" # Получается бесплатно на сайте ngrok
-    command:
-      # Направляем весь публичный трафик на 80 порт твоего Nginx Proxy Manager
-      - "http"
-      - "npm:80" 
-    ports:
-      - "4040:4040"
-    networks:
-      - nocodb-demo-network
   front:
     image: "ghcr.io/viktor-titov/demo-front:0.0.0"
-    container_name: demo-front
+    container_name: nocodb-demo-front
     ports:
       - "1234:80"
     restart: unless-stopped
@@ -35,8 +21,8 @@ services:
     depends_on:
       - root_db
     ports:
-      - '80:80'
-      - '81:81'
+      - '81:80'
+      - '82:81'
       - '443:443'
     volumes:
       - npm_data:/data
