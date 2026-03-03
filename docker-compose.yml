@@ -87,6 +87,8 @@ services:
       DATABASE_NAME: pachamama
       DATABASE_USER: postgres
       DATABASE_PASSWORD: password
+      # Добавляем разрешенные хосты:
+      BASEROW_EXTRA_ALLOWED_HOSTS: baserow,pachamama-baserow
     volumes:
       - "baserow_data:/baserow/data"
     networks:
