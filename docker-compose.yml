@@ -73,7 +73,25 @@ services:
       - "nc_data:/usr/app/data"
     networks:
       - pachamama-network
-  postgres: 
+  baserow:
+    image: "baserow/baserow:2.1.3"
+    container_name: pachamama-baserow
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      BASEROW_PUBLIC_URL: https://baserow.nulltomato-demo.ru
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: pachamama
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: password
+    volumes:
+      - "baserow_data:/baserow/data"
+    networks:
+      - pachamama-network
+  postgres:
     image: postgres:16.6
     container_name: pachamama-postgres
     environment: 
@@ -109,6 +127,7 @@ volumes:
   n8n_data:
   npm_data:
   npm_letsencrypt:
+  baserow_data:
 networks:
   pachamama-network:
     driver: bridge
