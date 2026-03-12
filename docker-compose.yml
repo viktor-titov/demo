@@ -1,135 +1,167 @@
 name: pachamama
 
+# Настройки логирования по умолчанию для всех сервисов
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "${LOG_MAX_SIZE}"
+    max-file: "${LOG_MAX_FILES}"
+
 services:
   front:
     image: "ghcr.io/viktor-titov/demo-front:0.0.2"
     container_name: pachamama-front
-    ports:
-      - "1234:80"
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - pachamama-network
+
+  # Прокси для управления всеми сервисами через веб-интерфейс
+  # и получения сертификатов Let's Encrypt
+  # https://nginxproxymanager.com/
   npm:
-    image: 'jc21/nginx-proxy-manager:latest'
+    image: 'jc21/nginx-proxy-manager:2.14.0'
     container_name: pachamama-npm
     restart: unless-stopped
+    logging: *default-logging
     environment:
-      TZ: "Australia/Brisbane"
+      TZ: "${TZ:-UTC}"
       DB_POSTGRES_HOST: postgres
       DB_POSTGRES_PORT: 5432
-      DB_POSTGRES_USER: postgres
-      DB_POSTGRES_PASSWORD: password
-    depends_on:
-      - postgres
-    ports:
-      - '80:80'
-      - '81:81'
-      - '443:443'
-    volumes:
-      - npm_data:/data
-      - npm_letsencrypt:/etc/letsencrypt
-    networks:
-      - pachamama-network
-  n8n:
-    image: "docker.n8n.io/n8nio/n8n"
-    container_name: pachamama-n8n
-    restart: always
+      DB_POSTGRES_USER: ${POSTGRES_USER}
+      DB_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_POSTGRES_NAME: ${DB_NPM_NAME:-pachamama_npm_db}
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "5678:5678"
+      - '80:80'
+      - '443:443'
+      - '81:81'   # TODO: пока не вижу способов сделать это про другому.
+    volumes:
+      - pachamama_npm_data:/data
+      - pachamama_npm_letsencrypt:/etc/letsencrypt
+    networks:
+      - pachamama-network
+
+  # Сервис для автоматизации задач и интеграции между сервисами
+  # https://n8n.io/
+  n8n:
+    image: "docker.n8n.io/n8nio/n8n"
+    container_name: pachamama-n8n
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
-      # GENERIC_TIMEZONE: "<YOUR_TIMEZONE>"
-      # TZ: "<YOUR_TIMEZONE>"
+      TZ: "${TZ:-UTC}"
       N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: true
       N8N_SECURE_COOKIE: false
       N8N_RUNNERS_ENABLED: true
       DB_TYPE: postgresdb
-      DB_POSTGRESDB_DATABASE: pachamama
       DB_POSTGRESDB_HOST: postgres
       DB_POSTGRESDB_PORT: 5432
-      DB_POSTGRESDB_USER: postgres
-      # DB_POSTGRESDB_SCHEMA: <POSTGRES_SCHEMA>
-      DB_POSTGRESDB_PASSWORD: password
-      WEBHOOK_URL: "https://n8n.nulltomato-demo.ru"
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_POSTGRESDB_DATABASE: ${DB_N8N_NAME:-pachamama_n8n_db}
+      WEBHOOK_URL: "${N8N_WEBHOOK_URL}"
     volumes:
-      - "n8n_data:/home/node/.n8n"
+      - "pachamama_n8n_data:/home/node/.n8n"
     networks:
       - pachamama-network
     
+  # Сервис для создания баз данных и управления ими через веб-интерфейс
+  # https://nocodb.com/
   nocodb: 
-    image: "nocodb/nocodb:latest"
+    image: "nocodb/nocodb:0.301.3"
     container_name: pachamama-nocodb
+    restart: unless-stopped
+    logging: *default-logging
     depends_on: 
       postgres: 
         condition: service_healthy
     environment: 
-      NC_DB: "pg://postgres:5432?u=postgres&p=password&d=pachamama"
-    ports: 
-      - "8080:8080"
-    restart: always
+      NC_DB: "pg://postgres:5432?u=${POSTGRES_USER}&p=${POSTGRES_PASSWORD}&d=${DB_NOCODB_NAME:-pachamama_nocodb_db}"
+      TZ: "${TZ:-UTC}"
     volumes: 
-      - "nc_data:/usr/app/data"
+      - "pachamama_nocodb_data:/usr/app/data"
     networks:
       - pachamama-network
+
+  # Сервис для создания баз данных и управления ими через веб-интерфейс
+  # https://baserow.io/
   baserow:
-    image: "baserow/baserow:2.1.3"
+    image: "baserow/baserow:2.1.4"
     container_name: pachamama-baserow
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      BASEROW_PUBLIC_URL: https://baserow.nulltomato-demo.ru
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
-      DATABASE_NAME: pachamama
-      DATABASE_USER: postgres
-      DATABASE_PASSWORD: password
-      # Добавляем разрешенные хосты:
+      DATABASE_NAME: ${DB_BASEROW_NAME:-pachamama_baserow_db}
+      DATABASE_USER: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      BASEROW_PUBLIC_URL: "${BASEROW_PUBLIC_URL}"
       BASEROW_EXTRA_ALLOWED_HOSTS: baserow,pachamama-baserow
+      TZ: "${TZ:-UTC}"
     volumes:
-      - "baserow_data:/baserow/data"
+      - "pachamama_baserow_data:/baserow/data"
     networks:
       - pachamama-network
+
+  # Сервис для хранения данных и управления ими через SQL
   postgres:
     image: postgres:16.6
     container_name: pachamama-postgres
+    restart: unless-stopped
+    logging: *default-logging
     environment: 
-      POSTGRES_DB: pachamama
-      POSTGRES_PASSWORD: password
-      POSTGRES_USER: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-pachamama}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Кастомная переменная (перечисляем через запятую)
+      POSTGRES_MULTIPLE_DATABASES: "${DB_N8N_NAME:-pachamama_n8n_db},${DB_NPM_NAME:-pachamama_npm_db},${DB_NOCODB_NAME:-pachamama_nocodb_db},${DB_BASEROW_NAME:-pachamama_baserow_db}"
     healthcheck:
-      # test: ['CMD-SHELL', 'pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
-      test: ['CMD-SHELL', 'pg_isready -h localhost -U postgres -d pachamama']
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: always
+      test: ['CMD-SHELL', 'pg_isready -h localhost -U ${POSTGRES_USER} -d ${DB_N8N_NAME}']
+      interval: 13s
+      timeout: 8s
+      retries: 5
     volumes: 
-      - "db_data:/var/lib/postgresql/data"
+      - "pachamama_db_data:/var/lib/postgresql/data"
+      # Монтируем наш скрипт в специальную папку образа в режиме read-only
+      - "./init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro"
     networks:
       - pachamama-network
+
+  # Сервис для управления базой данных через веб-интерфейс
+  # https://www.pgadmin.org/
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: dpage/pgadmin4:8.4
     container_name: pachamama-pgadmin
-    restart: always
-    ports:
-      - "5050:80"
+    restart: unless-stopped
+    logging: *default-logging
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@mail.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      TZ: "${TZ:-UTC}"
+    volumes:
+      - "pachamama_pgadmin_data:/var/lib/pgadmin"
     networks:
       - pachamama-network
+
 volumes: 
-  db_data:
-  nc_data:
-  pgadmin_data:
-  n8n_data:
-  npm_data:
-  npm_letsencrypt:
-  baserow_data:
+  pachamama_db_data:
+  pachamama_nocodb_data:
+  pachamama_pgadmin_data:
+  pachamama_n8n_data:
+  pachamama_npm_data:
+  pachamama_npm_letsencrypt:
+  pachamama_baserow_data:
+
 networks:
   pachamama-network:
     driver: bridge
